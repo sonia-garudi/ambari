@@ -188,8 +188,6 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
     this.set('stopChecking', false);
     this.set('newAmbariOsTypes',[]);
     this.set('promptAmbariRepoUrl', false);
-    this.set('newAmbariOsTypes',[]);
-    this.set('promptAmbariRepoUrl', false);
     this.set('bootstrapInProgress', false);
   },
 
