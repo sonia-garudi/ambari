@@ -79,6 +79,11 @@ class BSHostStatusCollector {
           if (statusCode.equals("0")) {
             status.setStatus("DONE");
           }
+          if (statusCode.startsWith("44")) {
+            String[] sc = statusCode.split(":");
+            status.setOsType(sc[1]);
+            statusCode = sc[0];
+          }
           
           updateStatus(status, statusCode);
         } catch (IOException e) {
