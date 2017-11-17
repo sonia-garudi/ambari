@@ -308,10 +308,12 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
       App.router.send('removeHosts', hosts);
       self.hosts.removeObjects(hosts);
       hosts.forEach(function(_host) {
-        var ambariOsTypeIndex;
+        var ambariOsTypeIndex = -1;
         self.newAmbariOsTypes.some(function(os, index) {
-          ambariOsTypeIndex = index;
-          return os.hosts.contains(_host.name);
+          if (os.hosts.contains(_host.name)){
+            ambariOsTypeIndex = index;
+            return true;
+          }
         });
         if (ambariOsTypeIndex != -1) {
           self.newAmbariOsTypes[ambariOsTypeIndex].hosts.removeObject(_host.name);
@@ -554,25 +556,22 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
       if (!keepPolling && data.hostsStatus.someProperty('statusCode', "44")) {
         data.hostsStatus.forEach(function(host) {
           if (host.statusCode == 44) {
-            var ambariOsTypeIndex;
-            if (!this.newAmbariOsTypes.someProperty('os_type',host.osType)) {
-              this.newAmbariOsTypes.pushObject({
-                'os_type' : host.osType,
-                'ambari_repo' : "",
-                'hosts' : []
-              });
-              this.newAmbariOsTypes.some(function(diffOs, index) {
+            var ambariOsTypeIndex = -1;
+            this.newAmbariOsTypes.some(function(diffOs, index) {
+              if (diffOs.os_type == host.osType) {
                 ambariOsTypeIndex = index;
-                return diffOs.os_type == host.osType;
-              });
-              if (!this.newAmbariOsTypes[ambariOsTypeIndex].hosts.contains(host.hostName)){
-                this.newAmbariOsTypes[ambariOsTypeIndex].hosts.push(host.hostName);
+                return true;
               }
+            });
+            if (ambariOsTypeIndex == -1) {
+              var tmpNewAmbariOsType = {
+                  'os_type' : host.osType,
+                  'ambari_repo' : "",
+                  'hosts' : []
+              };
+              tmpNewAmbariOsType.hosts.push(host.hostName);
+              this.newAmbariOsTypes.pushObject(tmpNewAmbariOsType);
             } else {
-              this.newAmbariOsTypes.some(function(diffOs, index) {
-                ambariOsTypeIndex = index;
-                return diffOs.os_type == host.osType;
-              });
               if (!this.newAmbariOsTypes[ambariOsTypeIndex].hosts.contains(host.hostName)){
                 this.newAmbariOsTypes[ambariOsTypeIndex].hosts.push(host.hostName);
               }
@@ -653,8 +652,8 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
    * @type {bool}
    */
   checkAmbariRepoSubmitDisabled : function() {
-    return (this.get('isRegistrationInProgress') || !this.get('isWarningsLoaded')) || App.get('router.btnClickInProgress') || this.get('bootstrapInProgress');
-  }.property('isRegistrationInProgress', 'isWarningsLoaded', 'bootstrapInProgress'),
+    return (this.get('isRegistrationInProgress') || App.get('router.btnClickInProgress') || this.get('bootstrapInProgress');
+  }.property('isRegistrationInProgress', 'bootstrapInProgress'),
 
   /**
    * Is ambari repo submit button disabled
