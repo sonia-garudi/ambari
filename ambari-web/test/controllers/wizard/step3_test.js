@@ -2603,7 +2603,8 @@ describe('App.WizardStep3Controller', function () {
       c.reopen({
         bootHosts: [
           Em.Object.create({name: 'host1', bootStatus: 'FAILED'})
-        ]
+        ],
+        newAmbariOsTypes: []
       });
       var data1 = {
             status: 'ERROR',
@@ -2775,7 +2776,7 @@ describe('App.WizardStep3Controller', function () {
 
     it('should show ambari repo url prompt for empty textboxes', function () {
       var newAmbariOsTypes = [
-                              Em.Object.create({os_type : 'os1', ambari_repo : "http//ambari-repo", hasError : false, hosts : ['host1']}),
+                              Em.Object.create({os_type : 'os1', ambari_repo : "http://ambari-repo", hasError : false, hosts : ['host1']}),
                               Em.Object.create({os_type : 'os2', ambari_repo : "", hasError : false, hosts : ['host2']})
                               ];
       controller.set('newAmbariOsTypes',newAmbariOsTypes);
