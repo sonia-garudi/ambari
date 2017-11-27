@@ -2603,7 +2603,8 @@ describe('App.WizardStep3Controller', function () {
       c.reopen({
         bootHosts: [
           Em.Object.create({name: 'host1', bootStatus: 'FAILED'})
-        ]
+        ],
+        newAmbariOsTypes: []
       });
       var data1 = {
             status: 'ERROR',
