@@ -378,41 +378,6 @@ describe('App.WizardStep3Controller', function () {
       expect(c.get('isSubmitDisabled')).to.equal(true);
     });
 
-    it('should remove ambari repo prompt if no host of os_type exist', function () {
-      var hosts = [
-            Em.Object.create({name: 'host1'}),
-            Em.Object.create({name: 'host2'})
-          ];
-      c.reopen({
-        hosts: hosts,
-        promptAmbariRepoUrl: true,
-        newAmbariOsTypes : [
-          Em.Object.create({os_type : 'os1', hosts : ['host2']})
-        ]
-      });
-      var removeHosts = [{name: 'host2'}];
-      c.removeHosts(removeHosts).onPrimary();;
-      expect(c.get('promptAmbariRepoUrl')).to.equal(false);
-    });
-
-    it('should not remove ambari repo prompt if a host of os_type exist', function () {
-      var hosts = [
-            Em.Object.create({name: 'host1'}),
-            Em.Object.create({name: 'host2'}),
-            Em.Object.create({name: 'host3'})
-          ];
-      c.reopen({
-        hosts: hosts,
-        promptAmbariRepoUrl: true,
-        newAmbariOsTypes : [
-          Em.Object.create({os_type : 'os1', hosts : ['host2','host3']})
-        ]
-      });
-      var removeHosts = [{name: 'host2'}];
-      c.removeHosts(removeHosts).onPrimary();;
-      expect(c.get('promptAmbariRepoUrl')).to.equal(true);
-    });
-
   });
 
   describe('#removeSelectedHosts', function () {
@@ -542,8 +507,7 @@ describe('App.WizardStep3Controller', function () {
             hosts: ['host0', 'host1'],
             user: 'root',
             sshPort: '123',
-            userRunAs: item.userRunAs,
-            ambariRepoUrls: "null"
+            userRunAs: item.userRunAs
           }));
         });
 
@@ -2359,8 +2323,7 @@ describe('App.WizardStep3Controller', function () {
           hosts: ['host0', 'host1'],
           user: 'root',
           sshPort: '123',
-          userRunAs: item.userRunAs,
-          ambariRepoUrls: "null"
+          userRunAs: item.userRunAs
         }));
       });
     });
@@ -2593,196 +2556,6 @@ describe('App.WizardStep3Controller', function () {
     });
     it('disk_info.length', function () {
       expect(host.get('disk_info.length')).to.equal(2);
-    });
-
-  });
-
-  describe('#doBootstrapSuccessCallback', function () {
-
-    it('should prompt for ambari repo url if os_type of host added is different', function () {
-      c.reopen({
-        bootHosts: [
-          Em.Object.create({name: 'host1', bootStatus: 'FAILED'})
-        ],
-        newAmbariOsTypes: []
-      });
-      var data1 = {
-            status: 'ERROR',
-            hostsStatus: [
-              Em.Object.create({hostName: 'host1', status: 'FAILED', statusCode: '44', osType: 'os1', log: 'log'})
-            ]
-          };
-      c.doBootstrapSuccessCallback(data1);
-      expect(c.get('promptAmbariRepoUrl')).to.equal(true);
-    });
-  });
-
-  describe('#checkAmbariRepoUI', function () {
-
-    it('check space', function () {
-      var newAmbariOsTypes = [
-                              Em.Object.create({os_type : 'os1', ambari_repo : "ambari repo", hosts : ['host1']})
-                              ];
-      c.reopen({
-        newAmbariOsTypes: newAmbariOsTypes
-      });
-      c.checkAmbariRepoUI();
-      expect(c.get('newAmbariOsTypes')[0].hasError).to.equal(true);
-      expect(c.get('newAmbariOsTypes')[0].ambariRepoUIError).to.equal("Please enter a valid URL");
-    });
-
-    it('check invalid url', function () {
-      var newAmbariOsTypes = [
-                              Em.Object.create({os_type : 'os1', ambari_repo : "http//ambari-repo", hosts : ['host1']})
-                              ];
-      c.reopen({
-        newAmbariOsTypes: newAmbariOsTypes
-      });
-      c.checkAmbariRepoUI();
-      expect(c.get('newAmbariOsTypes')[0].hasError).to.equal(true);
-      expect(c.get('newAmbariOsTypes')[0].ambariRepoUIError).to.equal("Please enter a valid URL");
-    });
-  });
-
-  describe('#isAmbariRepoURLSubmitDisabled', function () {
-
-    var cases = [
-                 {
-                   allAmbariRepoUrlsEmpty: true,
-                   invalidAmbariRepoUrlExists: false,
-                   isAmbariRepoURLSubmitDisabled: true,
-                   description: 'all textboxes are empty',
-                   title: 'all empty '
-                 },
-                 {
-                   allAmbariRepoUrlsEmpty: false,
-                   invalidAmbariRepoUrlExists: true,
-                   isAmbariRepoURLSubmitDisabled: true,
-                   description: 'multiple textboxes with some empty and some with invalid urls',
-                   title: 'has invalid, has empty'
-                 },
-                 {
-                   allAmbariRepoUrlsEmpty: false,
-                   invalidAmbariRepoUrlExists: false,
-                   isAmbariRepoURLSubmitDisabled: false,
-                   description: 'multiple textboxes with some empty and some with valid urls',
-                   title: 'has valid, has empty'
-                 },
-                 {
-                   allAmbariRepoUrlsEmpty: false,
-                   invalidAmbariRepoUrlExists: false,
-                   isAmbariRepoURLSubmitDisabled: false,
-                   description: 'all textboxes valid urls',
-                   title: 'all valid'
-                 }
-                 ];
-
-    cases.forEach(function (item) {
-
-      describe(item.description, function () {
-
-        beforeEach(function () {
-          c.reopen({
-            checkAmbariRepoSubmitDisabled: false,
-            allAmbariRepoUrlsEmpty: item.allAmbariRepoUrlsEmpty,
-            invalidAmbariRepoUrlExists: item.invalidAmbariRepoUrlExists
-          });
-          sinon.stub(App, 'get').withArgs('router.btnClickInProgress').returns(false);
-        });
-
-        afterEach(function () {
-          App.get.restore();
-        });
-
-        it(item.title, function () {
-          expect(c.get('isAmbariRepoURLSubmitDisabled')).to.equal(item.isAmbariRepoURLSubmitDisabled);
-        });
-      });
-    });
-
-  });
-
-  describe('#bootstrapWithAmbariRepoUrl', function () {
-
-    var customizeAgentUserAccountCases = [
-                 {
-                   customizeAgentUserAccount: true,
-                   userRunAs: 'user',
-                   title: 'Ambari Agent user account customize enabled'
-                 },
-                 {
-                   customizeAgentUserAccount: false,
-                   userRunAs: 'root',
-                   title: 'Ambari Agent user account customize disabled'
-                 }
-                 ];
-    var controller = App.WizardStep3Controller.create({
-      content: {
-        installOptions: {
-          sshKey: 'key',
-          sshUser: 'root',
-          sshPort: '123',
-          agentUser: 'user'
-        },
-        controllerName: 'installerController'
-      },
-    });
-
-    beforeEach(function () {
-      sinon.stub(App.router.get('installerController'), 'launchBootstrap', Em.K);
-      this.mock = sinon.stub(App, 'get');
-    });
-
-    afterEach(function () {
-      App.router.get('installerController').launchBootstrap.restore();
-      this.mock.restore();
-    });
-
-    customizeAgentUserAccountCases.forEach(function (item) {
-      it(item.title, function () {
-        controller.set('newAmbariOsTypes', [Em.Object.create({os_type : 'os1', ambari_repo : "http://ambari-repo", ambariRepoUIError : "", hasError : false, hosts : ['host1']})]);
-        this.mock.withArgs('supports.customizeAgentUserAccount').returns(item.customizeAgentUserAccount);
-        controller.bootstrapWithAmbariRepoUrl();
-        expect(App.router.get('installerController.launchBootstrap').firstCall.args[0]).to.equal(JSON.stringify({
-          verbose: true,
-          sshKey: 'key',
-          hosts: ['host1'],
-          user: 'root',
-          sshPort: '123',
-          userRunAs: item.userRunAs,
-          ambariRepoUrls: "[{\"os_type\":\"os1\",\"ambariRepoUIError\":\"\",\"hasError\":false,\"hosts\":[\"host1\"],\"ambari_repo\":\"http://ambari-repo\"}]"
-        }));
-      });
-    });
-
-    it('bootstrap hosts with ambari repo url not null', function () {
-      var newAmbariOsTypes = [
-                              Em.Object.create({os_type : 'os1', ambari_repo : "http://ambari-repo", ambariRepoUIError: "", hasError : false, hosts : ['host1']}),
-                              Em.Object.create({os_type : 'os2', ambari_repo : "", ambariRepoUIError: "", hasError : false, hosts : ['host2']})
-                              ];
-      controller.set('newAmbariOsTypes',newAmbariOsTypes);
-      this.mock.withArgs('supports.customizeAgentUserAccount').returns(false);
-      controller.bootstrapWithAmbariRepoUrl();
-      expect(App.router.get('installerController.launchBootstrap').firstCall.args[0]).to.equal(JSON.stringify({
-        verbose: true,
-        sshKey: 'key',
-        hosts: ['host1'],
-        user: 'root',
-        sshPort: '123',
-        userRunAs: 'root',
-        ambariRepoUrls: "[{\"os_type\":\"os1\",\"ambariRepoUIError\":\"\",\"hasError\":false,\"hosts\":[\"host1\"],\"ambari_repo\":\"http://ambari-repo\"}]"
-      }));
-    });
-
-    it('should show ambari repo url prompt for empty textboxes', function () {
-      var newAmbariOsTypes = [
-                              Em.Object.create({os_type : 'os1', ambari_repo : "http://ambari-repo", hasError : false, hosts : ['host1']}),
-                              Em.Object.create({os_type : 'os2', ambari_repo : "", hasError : false, hosts : ['host2']})
-                              ];
-      controller.set('newAmbariOsTypes',newAmbariOsTypes);
-      this.mock.withArgs('supports.customizeAgentUserAccount').returns(false);
-      controller.bootstrapWithAmbariRepoUrl();
-      expect(controller.get('promptAmbariRepoUrl'), true);
     });
 
   });

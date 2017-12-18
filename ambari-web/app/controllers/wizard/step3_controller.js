@@ -184,9 +184,6 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
     this.set('isLoaded', false);
     this.set('isSubmitDisabled', true);
     this.set('stopChecking', false);
-    this.set('newAmbariOsTypes', []);
-    this.set('promptAmbariRepoUrl', false);
-    this.set('bootstrapInProgress', false);
   },
 
   /**
@@ -201,8 +198,7 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
         'hosts': this.getBootstrapHosts(),
         'user': this.get('content.installOptions.sshUser'),
         'sshPort': this.get('content.installOptions.sshPort'),
-        'userRunAs': App.get('supports.customizeAgentUserAccount') ? this.get('content.installOptions.agentUser') : 'root',
-        'ambariRepoUrls': "null"
+        'userRunAs': App.get('supports.customizeAgentUserAccount') ? this.get('content.installOptions.agentUser') : 'root'
     });
     App.router.get(this.get('content.controllerName')).launchBootstrap(bootStrapData, function (requestId) {
       if (requestId == '0') {
@@ -305,24 +301,6 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
     return App.showConfirmationPopup(function () {
       App.router.send('removeHosts', hosts);
       self.hosts.removeObjects(hosts);
-      hosts.forEach(function(_host) {
-        var ambariOsTypeIndex = -1;
-        self.newAmbariOsTypes.some(function(os, index) {
-          if (os.hosts.contains(_host.name)){
-            ambariOsTypeIndex = index;
-            return true;
-          }
-        });
-        if (ambariOsTypeIndex != -1) {
-          self.newAmbariOsTypes[ambariOsTypeIndex].hosts.removeObject(_host.name);
-          if (self.newAmbariOsTypes[ambariOsTypeIndex].hosts.length == 0) {
-            self.newAmbariOsTypes.removeAt(ambariOsTypeIndex);
-          }
-          if (!self.newAmbariOsTypes.length) {
-            self.set('promptAmbariRepoUrl', false);
-          }
-        }
-      });
       self.stopRegistration();
       if (!self.hosts.length) {
         self.set('isSubmitDisabled', true);
@@ -393,7 +371,6 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
    * @method retryHosts
    */
   retryHosts: function (hosts) {
-    this.set('promptAmbariRepoUrl', false);
     var self = this;
     var bootStrapData = JSON.stringify({
         'verbose': true,
@@ -401,15 +378,13 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
         'hosts': hosts.mapProperty('name'),
         'user': this.get('content.installOptions.sshUser'),
         'sshPort': this.get('content.installOptions.sshPort'),
-        'userRunAs': App.get('supports.customizeAgentUserAccount') ? this.get('content.installOptions.agentUser') : 'root',
-        'ambariRepoUrls': "null"
+        'userRunAs': App.get('supports.customizeAgentUserAccount') ? this.get('content.installOptions.agentUser') : 'root'
       });
     this.set('numPolls', 0);
     this.set('registrationStartedAt', null);
     this.set('isHostsWarningsLoaded', false);
     this.set('stopChecking', false);
     this.set('isSubmitDisabled', true);
-    this.set('bootstrapInProgress', true);
     if (this.get('content.installOptions.manualInstall')) {
       this.startRegistration();
     } else {
@@ -548,37 +523,6 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
       var installedHosts = App.Host.find().mapProperty('hostName');
       var isErrorStatus = data.status == 'ERROR';
       this.set('isBootstrapFailed', isErrorStatus);
-
-      this.set('bootstrapInProgress', keepPolling);
-      // check for prompting ambari repo url
-      if (!keepPolling && data.hostsStatus.someProperty('statusCode', "44")) {
-        data.hostsStatus.forEach(function(host) {
-          if (host.statusCode == 44) {
-            var ambariOsTypeIndex = -1;
-            this.newAmbariOsTypes.some(function(diffOs, index) {
-              if (diffOs.os_type == host.osType) {
-                ambariOsTypeIndex = index;
-                return true;
-              }
-            });
-            if (ambariOsTypeIndex == -1) {
-              var tmpNewAmbariOsType = {
-                  'os_type' : host.osType,
-                  'ambari_repo' : "",
-                  'hosts' : []
-              };
-              tmpNewAmbariOsType.hosts.push(host.hostName);
-              this.newAmbariOsTypes.pushObject(tmpNewAmbariOsType);
-            } else {
-              if (!this.newAmbariOsTypes[ambariOsTypeIndex].hosts.contains(host.hostName)){
-                this.newAmbariOsTypes[ambariOsTypeIndex].hosts.push(host.hostName);
-              }
-            }
-          }
-        },this);
-        this.set('promptAmbariRepoUrl',true);
-      }
-
       if (isErrorStatus || data.hostsStatus.mapProperty('hostName').removeObjects(installedHosts).length != this.get('bootHosts').length) {
 
         var hosts = this.get('bootHosts');
@@ -605,119 +549,6 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
         }, pollingInterval);
       }
     }
-  },
-
-  /**
-   * check ambari repository URL entered on the UI
-   * @method checkAmbariRepoUI
-   */
-  checkAmbariRepoUI : (function() {
-    var regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
-    this.newAmbariOsTypes.forEach(function(obj) {
-      if (obj.ambari_repo == '' || obj.ambari_repo == null) {
-        Em.set(obj, 'ambariRepoUIError', "");
-        Em.set(obj, 'hasError', false);
-      } else if (/\s/.test(obj.ambari_repo) || !regex.test(obj.ambari_repo)) {
-        Em.set(obj, 'ambariRepoUIError', Em.I18n.t('installer.step3.ambariRepoUIError.stringError'));
-        Em.set(obj, 'hasError', true);
-      } else {
-        Em.set(obj, 'ambariRepoUIError', "");
-        Em.set(obj, 'hasError', false);
-      }
-    }, this);
-  }).observes('newAmbariOsTypes.@each.ambari_repo'),
-
-  /**
-   * return true if 1 or more ostypes have invalid URL
-   * @type {bool}
-   */
-  invalidAmbariRepoUrlExists : (function() {
-    return this.newAmbariOsTypes.someProperty('hasError', true);
-  }).property('newAmbariOsTypes.@each.hasError'),
-
-  /**
-   * return true if all textboxes for ambari repo url are empty
-   * @type {bool}
-   */
-  allAmbariRepoUrlsEmpty : (function() {
-    return this.newAmbariOsTypes.getEach('ambari_repo').every(function(value) {
-      return value == null || value == "";
-    });
-  }).property('newAmbariOsTypes.@each.ambari_repo'),
-
-  /**
-   * check conditions to disable ambari repo submit button
-   * @type {bool}
-   */
-  checkAmbariRepoSubmitDisabled : function() {
-    return (this.get('isRegistrationInProgress') || !this.get('isWarningsLoaded')) || App.get('router.btnClickInProgress') || this.get('bootstrapInProgress');
-  }.property('isRegistrationInProgress', 'isWarningsLoaded', 'bootstrapInProgress'),
-
-  /**
-   * Is ambari repo submit button disabled
-   * @type {bool}
-   */
-  isAmbariRepoURLSubmitDisabled : Em.computed.or('invalidAmbariRepoUrlExists', 'allAmbariRepoUrlsEmpty', 'checkAmbariRepoSubmitDisabled'),
-
-  /**
-   * Do bootstrap calls with entered ambari repo url
-   * @method bootstrapWithAmbariRepoUrl
-   */
-  bootstrapWithAmbariRepoUrl : function() {
-    var self = this;
-    var tmpNewAmbariOsTypes = [];
-    var tmpBootstrapHosts = [];
-    self.newAmbariOsTypes.forEach(function(os) {
-      if (os.ambari_repo != "") {
-        tmpNewAmbariOsTypes.pushObject(os);
-        self.newAmbariOsTypes.removeObject(os);
-      }
-    });
-    if (self.newAmbariOsTypes.length <= 0) {
-      this.set('promptAmbariRepoUrl', false);
-    }
-    tmpNewAmbariOsTypes.forEach(function(os) {
-      os.hosts.forEach(function(host) {
-        tmpBootstrapHosts.push(host);
-      });
-    });
-    var bootStrapData = JSON.stringify({
-      'verbose' : true,
-      'sshKey' : this.get('content.installOptions.sshKey'),
-      'hosts' : tmpBootstrapHosts,
-      'user' : this.get('content.installOptions.sshUser'),
-      'sshPort' : this.get('content.installOptions.sshPort'),
-      'userRunAs' : App.get('supports.customizeAgentUserAccount') ? this.get('content.installOptions.agentUser') : 'root',
-      'ambariRepoUrls' : JSON.stringify(tmpNewAmbariOsTypes)
-    });
-    this.set('numPolls', 0);
-    this.set('registrationStartedAt', null);
-    this.set('isHostsWarningsLoaded', false);
-    this.set('stopChecking', false);
-    this.set('isSubmitDisabled', true);
-    this.set('bootstrapInProgress',true);
-    var selectedHosts = this.get('bootHosts');
-    selectedHosts.forEach(function(_host) {
-      var bootHostName = _host.get('name');
-      for (var i = 0; i < tmpNewAmbariOsTypes.length; i++) {
-        if (tmpNewAmbariOsTypes[i] == bootHostName) {
-          _host.set('bootStatus', 'DONE');
-          _host.set('bootLog', 'Retrying ...');
-        }
-      }
-    }, this);
-
-    App.router.get(this.get('content.controllerName')).launchBootstrap(bootStrapData,function(requestId) {
-      if (requestId == '0') {
-        self.startBootstrap();
-      } else if (requestId) {
-        self.set('content.installOptions.bootRequestId',
-            requestId);
-        App.router.get(self.get('content.controllerName'))
-        .save('installOptions');
-        self.startBootstrap();
-      }
-    });
   },
 
   /**
