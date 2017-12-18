@@ -378,6 +378,48 @@ describe('App.WizardStep3Controller', function () {
       expect(c.get('isSubmitDisabled')).to.equal(true);
     });
 
+    it('should remove hdp url prompt if no host of os_type exist', function () {
+      var host1 = Em.Object.create({name: 'host1', os_type: 'os1'});
+      var host2 = Em.Object.create({name: 'host2', os_type: 'os2'});
+      var hosts = [
+            host1,
+            host2
+          ];
+      c.reopen({
+        hosts: hosts,
+        newAmbariOsTypes: [],
+        promptAmbariRepoUrl: false,
+        promptRepoInfo: true,
+        newSupportedOsList : [
+          Em.Object.create({os_type : 'os2'})
+        ]
+      });
+      c.removeHosts([host2]).onPrimary();
+      expect(c.get('promptRepoInfo')).to.equal(false);
+    });
+
+    it('should not remove hdp url prompt if a host of os_type exist', function () {
+      var host1 = Em.Object.create({name: 'host1', os_type: 'os1'});
+      var host2 = Em.Object.create({name: 'host2', os_type: 'os2'});
+      var host3 = Em.Object.create({name: 'host3', os_type: 'os2'});
+      var hosts = [
+            host1,
+            host2,
+            host3
+          ];
+      c.reopen({
+        hosts: hosts,
+        newAmbariOsTypes: [],
+        promptAmbariRepoUrl: false,
+        promptRepoInfo: true,
+        newSupportedOsList : [
+          Em.Object.create({os_type : 'os2'})
+        ]
+      });
+      c.removeHosts([host2]).onPrimary();;
+      expect(c.get('promptRepoInfo')).to.equal(true);
+    });
+
   });
 
   describe('#removeSelectedHosts', function () {
@@ -2727,6 +2769,49 @@ describe('App.WizardStep3Controller', function () {
 
     });
 
+  });
+
+  describe('#checkRepoForNewOsType', function () {
+    it('should show prompt if repos dont exist for os_type in allRepos', function () {
+      var bootHosts = [
+                       Em.Object.create({name: 'host1', bootStatus: 'REGISTERED'}),
+                       Em.Object.create({name: 'host2', bootStatus: 'REGISTERED'})
+                       ];
+      var jsonHostData = {items:[
+                                 Em.Object.create({Hosts:{os_type: 'os1',host_name: 'host1'}}),
+                                 Em.Object.create({Hosts:{os_type: 'os2',host_name: 'host2'}})
+                                 ]};
+      var allRepos = [
+                      {os_type: 'os1'}
+                      ];
+      var allSupportedOSList = {operating_systems: [
+                                                    {
+                                                      OperatingSystems: { os_type : 'os2'},
+                                                      repositories: [
+                                                                     {
+                                                                       Repositories: {
+                                                                         base_url: 'baseurl1'
+                                                                       }
+                                                                     },
+                                                                     {
+                                                                       Repositories: {
+                                                                         base_url: 'baseurl2'
+                                                                       }
+                                                                     }
+                                                                     ]
+                                                    }
+                                                    ]
+      };
+      c.reopen({
+        bootHosts: bootHosts,
+        allRepos: allRepos,
+        promptRepoInfo: false,
+        jsonHostData: jsonHostData,
+        allSupportedOSList: allSupportedOSList
+      });
+      c.checkRepoForNewOsType();
+      expect(c.get('promptRepoInfo')).to.equal(true);
+    });
   });
 
   describe('#getHostCheckTasksSuccess', function() {

@@ -1959,6 +1959,9 @@ var urls = {
       }
     }
   },
+  'wizard.get_version_definition': {
+    'real': '/version_definitions/{version_definition_id}?fields=operating_systems/repositories/Repositories/*',
+  },
   'wizard.step1.get_repo_version_by_id': {
     'real': '/stacks/{stackName}/versions?fields=repository_versions/operating_systems/repositories/*' +
     ',repository_versions/RepositoryVersions/*' +

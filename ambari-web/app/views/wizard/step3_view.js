@@ -337,4 +337,53 @@ App.WizardHostView = Em.View.extend({
 
 });
 
+/**
+ * Field for Repo url
+ */
+App.WizardStep3ViewRepoUrlInput = Em.TextField.extend({
 
+  layout : Ember.Handlebars.compile('<div class="pull-left">{{yield}}</div> {{#if view.valueWasChanged}}<div class="pull-right"><a class="btn-small" {{action "restoreValue" target="view"}}><i class="icon-undo"></i></a></div>{{/if}}'),
+
+  /**
+   * Submit form if "Enter" pressed
+   */
+  keyPress : function(event) {
+    if (event.keyCode == 13) {
+      this.get('parentView.controller').submit();
+      return false;
+    }
+    return true;
+  },
+
+  defaultValue : '',
+
+  /**
+   * Determines if user have put some new value
+   */
+  valueWasChanged : function() {
+    if(this.get('controller.isLocalRepo') && !this.get('value')) {
+      return false;
+    }
+    else {
+      return this.get('value') !== this.get('defaultValue');
+    }
+  }.property('value', 'defaultValue'),
+
+  didInsertElement : function() {
+    $("[rel=skip-validation-tooltip]").tooltip({ placement: 'right'});
+    this.set('defaultValue', this.get('value'));
+  },
+
+  /**
+   * Restore value and unset error-flag
+   * @method restoreValue
+   */
+  restoreValue : function() {
+    if(this.get('controller.isPublicRepo')) {
+      this.set('value', this.get('defaultValue'));
+    }
+    else if (this.get('controller.isLocalRepo')) {
+      this.set('value', '');
+    }
+  }
+});
