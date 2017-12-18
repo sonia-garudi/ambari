@@ -202,6 +202,70 @@ App.WizardStep3View = App.TableView.extend({
     }, this);
   },
 
+  /**
+   * Show warning message flag
+   *
+   * @type {bool}
+   */
+  warningExist: Em.computed.or('controller.invalidFormatUrlExist', 'isNoOsFilled'),
+
+  skipVerifyBaseUrl: Em.computed.or('controller.skipValidationChecked', 'controller.useRedhatSatellite'),
+
+  verifyBaseUrl: Em.computed.not('skipVerifyBaseUrl'),
+
+  showWarning: Em.computed.and('warningExist', 'verifyBaseUrl'),
+
+  /**
+   * If all OSes are empty
+   * @type {bool}
+   */
+  isNoOsFilled: function () {
+    var operatingSystems = this.get('controller.operatingSystems');
+    if (this.get('controller.useRedhatSatellite') || Em.isNone(operatingSystems)) {
+      return false;
+    }
+    var selectedOS = operatingSystems.filterProperty('isSelected', true);
+    return selectedOS.everyProperty('isNotFilled', true);
+  }.property('controller.operatingSystems.@each.isSelected', 'controller.operatingSystems.@each.isNotFilled', 'controller.useRedhatSatellite'),
+
+
+  /**
+   * Radio button for use Public repo
+   *
+   * @type {App.RadioButtonView}
+   */
+  usePublicRepoRadioButton: App.RadioButtonView.extend({
+    labelTranslate: 'installer.step1.selectUseRepoOptions.public',
+    checked: Em.computed.alias('controller.isPublicRepo'),
+
+    change: function () {
+      this.get('controller').usePublicRepo();
+    }
+  }),
+
+  /**
+   * Checkbox for use Public repo
+   *
+   * @type {App.RadioButtonView}
+   */
+  useLocalRepoRadioButton: App.RadioButtonView.extend({
+    labelTranslate: 'installer.step1.selectUseRepoOptions.local',
+    checked: Em.computed.alias('controller.isLocalRepo'),
+
+    change: function () {
+      this.get('controller').useLocalRepo();
+    }
+  }),
+
+  openPublicOptionDisabledWindow: function () {
+    return App.ModalPopup.show({
+      header: Em.I18n.t('installer.step1.selectUseRepoOptions.public.networkLost.popup.title'),
+      bodyClass: Ember.View.extend({
+        templateName: require('templates/wizard/step1/public_option_disabled_window_body')
+      }),
+      secondary: false
+    });
+  },
 
   /**
    * Filter hosts by category

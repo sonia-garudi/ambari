@@ -2814,6 +2814,133 @@ describe('App.WizardStep3Controller', function () {
     });
   });
 
+  describe('#editLocalRepository', function () {
+    it('should set invalidFormatError to true for invalid base url', function() {
+      var repositories = [{
+        base_url: 'invalid url',
+        last_base_url: 'http://last_base_url'
+      }];
+      c.reopen({
+        repositories : repositories
+      });
+      c.editLocalRepository();
+      expect(c.get('repositories')[0].invalidFormatError).to.equal(true);
+    });
+
+    it('should set invalidFormatError to false and update the last_base_url for valid base url', function() {
+      var repositories = [{
+        base_url: 'http://base_url',
+        last_base_url: 'http://last_base_url'
+      }];
+      c.reopen({
+        repositories : repositories
+      });
+      c.editLocalRepository();
+      expect(c.get('repositories')[0].invalidFormatError).to.equal(false);
+      expect(c.get('repositories')[0].last_base_url).to.equal('http://base_url');
+    });
+
+  });
+
+  describe('onNetworkIssuesExist', function () {
+    it('should remove base_url if networkIssueExist', function() {
+      var newSupportedOsList = [{
+        os_type : 'os1',
+        repositories: [
+                       {
+                         base_url: 'http://base_url',
+                         last_base_url: 'http://last_base_url'
+                       }
+                       ]
+      }];
+      c.reopen({
+        newSupportedOsList : newSupportedOsList,
+        networkIssuesExist : true
+      });
+      c.onNetworkIssuesExist();
+      expect(c.get('newSupportedOsList')[0].repositories[0].base_url).to.equal("");
+    });
+  });
+
+  describe('#usePublicRepo', function () {
+
+    beforeEach(function () {
+      var newSupportedOsList = [{
+        os_type : 'os1',
+        repositories: [
+                       {
+                         base_url: 'invalid_url',
+                         last_base_url: 'http://last_base_url',
+                         latest_base_url: 'http://latest_base_url'
+                       }
+                       ]
+      }];
+      c.reopen({
+        useRedhatSatellite: true,
+        isPublicRepo: false,
+        isLocalRepo: true,
+        newSupportedOsList : newSupportedOsList
+      });
+      c.usePublicRepo();
+    });
+
+    it('base_url is set to latest_base_url', function () {
+      expect(c.get('newSupportedOsList')[0].repositories[0].base_url).to.be.equal('http://latest_base_url');
+    });
+
+    it('`useRedhatSatellite` is set `false`', function () {
+      expect(c.get('useRedhatSatellite')).to.be.false;
+    });
+
+    it('`usePublicRepo` is set `true`', function () {
+      expect(c.get('isPublicRepo')).to.be.true;
+    });
+
+    it('`useLocalRepo` is set `false`', function () {
+      expect(c.get('isLocalRepo')).to.be.false;
+    });
+
+  });
+
+  describe('#useLocalRepo', function () {
+
+    beforeEach( function () {
+      var newSupportedOsList = [{
+        os_type : 'os1',
+        repositories: [
+                       {
+                         base_url: 'invalid_url',
+                         last_base_url: 'http://last_base_url',
+                         latest_base_url: 'http://latest_base_url'
+                       }
+                       ]
+      }];
+      c.reopen({
+        isPublicRepo: true,
+        isLocalRepo: false,
+        newSupportedOsList : newSupportedOsList
+      });
+      c.useLocalRepo();
+    });
+
+    it('base_url is set to blank', function () {
+      expect(c.get('newSupportedOsList')[0].repositories[0].base_url).to.be.equal('');
+    });
+
+    it('last_base_url is set to blank', function () {
+      expect(c.get('newSupportedOsList')[0].repositories[0].last_base_url).to.be.equal('');
+    });
+
+    it('`isPublicRepo` is set `false`', function () {
+      expect(c.get('isPublicRepo')).to.be.false;
+    });
+
+    it('`isLocalRepo` is set `true`', function () {
+      expect(c.get('isLocalRepo')).to.be.true;
+    });
+
+  });
+
   describe('#getHostCheckTasksSuccess', function() {
 
     beforeEach(function() {

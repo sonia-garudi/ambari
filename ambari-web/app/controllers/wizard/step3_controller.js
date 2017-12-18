@@ -37,6 +37,13 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
   allRepos: [],
 
   /**
+   * Skip repo-validation
+   *
+   * @type {bool}
+   */
+  skipValidationChecked: false,
+
+  /**
    * Timeout for registration
    * Based on <code>installOptions.manualInstall</code>
    * @type {number}
@@ -142,7 +149,7 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
     return (App.get('testMode')) ? true : !this.get('isRegistrationInProgress');
   }.property('isRegistrationInProgress'),
 
-  isNextButtonDisabled: Em.computed.or('App.router.btnClickInProgress', 'isSubmitDisabled'),
+  isNextButtonDisabled: Em.computed.or('App.router.btnClickInProgress', 'isSubmitDisabled', 'invalidFormatUrlExist'),
 
   isBackButtonDisabled: Em.computed.or('App.router.btnClickInProgress', 'isBackDisabled'),
 
@@ -896,14 +903,27 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
   doCheckRepoInfo : function() {
     var isInstaller = this.get('content.controllerName') == 'installerController';
     if (isInstaller) {
+      // Test redhatSatellite server(installer)
+      if (App.Stack.find().findProperty('isSelected', true).get('useRedhatSatellite') == true) {
+        this.set('promptRepoInfo', false);
+        return;
+      }
       this.generateAllReposForInstaller();
+    } else {
+      // Test redhatSatellite server(add host) - case 1
+      if (App.StackVersion.find().get('content.length') == 0) {
+        this.set('promptRepoInfo', false);
+        return;
+      }
     }
 
     var self = this;
     this.getSupportedOSList().done( function() {
       if (!isInstaller) {
-        self.loadRepoInfo().done( function() {
-          self.checkRepoForNewOsType();
+        self.loadRepoInfo().done( function(isAmbariManagedRepositories) {
+          if(isAmbariManagedRepositories){
+            self.checkRepoForNewOsType();
+          }
         });
       } else {
         self.checkRepoForNewOsType();
@@ -1009,14 +1029,21 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
     if (data.items.length) {
       data.items[0].repository_versions.forEach( function(repo_version) {
         if (repo_version.RepositoryVersions.id == params.repositoryVersionId) {
-          this.localRepoVersion = repo_version;
-          this.allRepos = this.generateAllReposForAddhost(Em.getWithDefault(repo_version, 'operating_systems', []));
+          // Test redhatSatellite server(add host) -case 2
+          if (repo_version.operating_systems[0].OperatingSystems.ambari_managed_repositories) {
+            this.localRepoVersion = repo_version;
+            this.allRepos = this.generateAllReposForAddhost(Em.getWithDefault(repo_version, 'operating_systems', []));
+            isAmbariManagedRepositories = true;
+          } else {
+            this.set('promptRepoInfo', false);
+            isAmbariManagedRepositories = false;
+          }
         }
       },this);
     } else {
       this.loadDefaultRepoInfo();
     }
-    params.dfd.resolve();
+    params.dfd.resolve(isAmbariManagedRepositories);
   },
 
   /**
@@ -1117,6 +1144,108 @@ App.WizardStep3Controller = Em.Controller.extend(App.ReloadPopupMixin, App.Check
     }
     this.set('newSupportedOsList', newSupportedOsList);
     this.set('promptRepoInfo', this.newSupportedOsList.length > 0);
+  },
+
+  /**
+   * This will return the list of repositories when called by method editLocalRepository
+   */
+  repositories: function () {
+    var repositories = [];
+    if(this.newSupportedOsList){
+      this.newSupportedOsList.forEach(function (os) {
+        os.repositories.forEach(function(repo) {
+          repositories.pushObject(repo);
+        }, this);
+      }, this);
+    }
+    return repositories;
+  }.property('newSupportedOsList.@each.repositories'),
+
+  /**
+   * Handler when editing any repository base_url on step 3
+   *
+   * @method editLocalRepository
+   */
+  editLocalRepository: function () {
+    var repositories = this.get('repositories');
+    if (!repositories) {
+      return;
+    }
+    repositories.forEach(function (repository) {
+      if (repository.last_base_url !== repository.base_url) {
+        Em.set(repository, 'last_base_url', repository.base_url);
+        Em.set(repository, 'validation', 'PENDING');
+        Em.set(repository, 'invalidFormatError', !this.isValidBaseUrl(repository.base_url));
+        if (!repository.base_url){
+          Em.set(repository, 'invalidFormatError', true);
+        }
+      }
+    }, this);
+  }.observes('repositories.@each.base_url'),
+
+  /**
+   * Validate base URL
+   * @param {string} value
+   * @returns {boolean}
+   */
+  isValidBaseUrl: function (value) {
+    var remotePattern = /^$|^(?:(?:https?|ftp):\/{2})(?:\S+(?::\S*)?@)?(?:(?:(?:[\w\-.]))*)(?::[0-9]+)?(?:\/\S*)?$/,
+    localPattern = /^$|^file:\/{2,3}([a-zA-Z][:|]\/){0,1}[\w~!*'();@&=\/\\\-+$,?%#.\[\]]+$/;
+    return remotePattern.test(value) || localPattern.test(value);
+  },
+
+  /**
+   * Returns true if 1 or more repository URLs on UI have invalidFormatError
+   * @returns {boolean}
+   */
+  invalidFormatUrlExist: function () {
+    var repositories = this.get('repositories');
+    if (!repositories) {
+      return false;
+    }
+    return repositories.someProperty('invalidFormatError', true);
+  }.property('repositories.@each.invalidFormatError'),
+
+  onNetworkIssuesExist: function() {
+    if (this.get('networkIssuesExist')) {
+      this.set('isPublicRepo',false);
+      this.set('isLocalRepo',true);
+      this.newSupportedOsList.forEach(function (os) {
+        os.repositories.forEach(function (repo) {
+          Em.set(repo,'base_url','');
+        });
+      });
+    }
+  }.observes('networkIssuesExist'),
+
+  /**
+   * Restore base urls for selected stack when user select to use public
+   * repository
+   */
+  usePublicRepo : function() {
+    this.set('isPublicRepo', true);
+    this.set('isLocalRepo', false);
+    this.set('useRedhatSatellite', false);
+    this.newSupportedOsList.forEach(function(repo) {
+      repo.repositories.forEach(function(repos) {
+        Em.set(repos, 'base_url', repos.latest_base_url);
+      }, this);
+    }, this);
+  },
+
+  /**
+   * Clean base urls for selected stack when user select to use local
+   * repository
+   */
+  useLocalRepo : function() {
+    this.set('isPublicRepo', false);
+    this.set('isLocalRepo', true);
+    this.newSupportedOsList.forEach(function(repo) {
+      repo.repositories.forEach(function(repos) {
+        Em.set(repos, 'base_url', '');
+        Em.set(repos, 'last_base_url', '');
+      }, this);
+    }, this);
   },
 
   _submitProceed: function () {
