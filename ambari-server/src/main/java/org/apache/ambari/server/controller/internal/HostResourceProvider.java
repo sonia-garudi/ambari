@@ -62,7 +62,6 @@ import org.apache.ambari.server.state.DesiredConfig;
 import org.apache.ambari.server.state.Host;
 import org.apache.ambari.server.state.MaintenanceState;
 import org.apache.ambari.server.state.ServiceComponentHost;
-import org.apache.ambari.server.state.State;
 import org.apache.ambari.server.state.stack.OsFamily;
 import org.apache.ambari.server.topology.ClusterTopology;
 import org.apache.ambari.server.topology.InvalidTopologyException;
@@ -73,7 +72,8 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
@@ -115,6 +115,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
   public static final String RECOVERY_SUMMARY_PROPERTY_ID = "recovery_summary";
   public static final String STATE_PROPERTY_ID = "host_state";
   public static final String TOTAL_MEM_PROPERTY_ID = "total_mem";
+  public static final String ATTRIBUTES_PROPERTY_ID = "attributes";
 
   public static final String HOST_CLUSTER_NAME_PROPERTY_ID = RESPONSE_KEY + PropertyHelper.EXTERNAL_PATH_SEP + CLUSTER_NAME_PROPERTY_ID;
   public static final String HOST_CPU_COUNT_PROPERTY_ID = RESPONSE_KEY + PropertyHelper.EXTERNAL_PATH_SEP + CPU_COUNT_PROPERTY_ID;
@@ -138,6 +139,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
   public static final String HOST_RECOVERY_SUMMARY_PROPERTY_ID = RESPONSE_KEY + PropertyHelper.EXTERNAL_PATH_SEP + RECOVERY_SUMMARY_PROPERTY_ID;
   public static final String HOST_STATE_PROPERTY_ID = RESPONSE_KEY + PropertyHelper.EXTERNAL_PATH_SEP + STATE_PROPERTY_ID;
   public static final String HOST_TOTAL_MEM_PROPERTY_ID = RESPONSE_KEY + PropertyHelper.EXTERNAL_PATH_SEP + TOTAL_MEM_PROPERTY_ID;
+  public static final String HOST_ATTRIBUTES_PROPERTY_ID = PropertyHelper.getPropertyId(RESPONSE_KEY,ATTRIBUTES_PROPERTY_ID);
 
   public static final String BLUEPRINT_PROPERTY_ID = "blueprint";
   public static final String HOST_GROUP_PROPERTY_ID = "host_group";
@@ -146,10 +148,41 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
 
   //todo use the same json structure for cluster host addition (cluster template and upscale)
 
-  protected static final String FORCE_DELETE_COMPONENTS = "force_delete_components";
+  /**
+   * The key property ids for a Host resource.
+   */
+  public static Map<Resource.Type, String> keyPropertyIds = ImmutableMap.<Resource.Type, String>builder()
+      .put(Resource.Type.Host, HOST_HOST_NAME_PROPERTY_ID)
+      .put(Resource.Type.Cluster, HOST_CLUSTER_NAME_PROPERTY_ID)
+      .build();
 
-
-  private static final Set<String> PK_PROPERTY_IDS = ImmutableSet.of(HOST_HOST_NAME_PROPERTY_ID);
+  /**
+   * The property ids for a Host resource.
+   */
+  public static Set<String> propertyIds = Sets.newHashSet(
+      HOST_CLUSTER_NAME_PROPERTY_ID,
+      HOST_CPU_COUNT_PROPERTY_ID,
+      HOST_DESIRED_CONFIGS_PROPERTY_ID,
+      HOST_DISK_INFO_PROPERTY_ID,
+      HOST_HOST_HEALTH_REPORT_PROPERTY_ID,
+      HOST_HOST_STATUS_PROPERTY_ID,
+      HOST_IP_PROPERTY_ID,
+      HOST_LAST_AGENT_ENV_PROPERTY_ID,
+      HOST_LAST_HEARTBEAT_TIME_PROPERTY_ID,
+      HOST_LAST_REGISTRATION_TIME_PROPERTY_ID,
+      HOST_MAINTENANCE_STATE_PROPERTY_ID,
+      HOST_HOST_NAME_PROPERTY_ID,
+      HOST_OS_ARCH_PROPERTY_ID,
+      HOST_OS_FAMILY_PROPERTY_ID,
+      HOST_OS_TYPE_PROPERTY_ID,
+      HOST_PHYSICAL_CPU_COUNT_PROPERTY_ID,
+      HOST_PUBLIC_NAME_PROPERTY_ID,
+      HOST_RACK_INFO_PROPERTY_ID,
+      HOST_RECOVERY_REPORT_PROPERTY_ID,
+      HOST_RECOVERY_SUMMARY_PROPERTY_ID,
+      HOST_STATE_PROPERTY_ID,
+      HOST_TOTAL_MEM_PROPERTY_ID,
+      HOST_ATTRIBUTES_PROPERTY_ID);
 
   @Inject
   private OsFamily osFamily;
@@ -162,15 +195,11 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
   /**
    * Create a  new resource provider for the given management controller.
    *
-   * @param propertyIds           the property ids
-   * @param keyPropertyIds        the key property ids
    * @param managementController  the management controller
    */
   @AssistedInject
-  HostResourceProvider(@Assisted Set<String> propertyIds,
-                       @Assisted Map<Resource.Type, String> keyPropertyIds,
-                       @Assisted AmbariManagementController managementController) {
-    super(propertyIds, keyPropertyIds, managementController);
+  HostResourceProvider(@Assisted AmbariManagementController managementController) {
+    super(Resource.Type.Host, propertyIds, keyPropertyIds, managementController);
 
     Set<RoleAuthorization> authorizationsAddDelete = EnumSet.of(RoleAuthorization.HOST_ADD_DELETE_HOSTS);
 
@@ -320,8 +349,6 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
 
     final Set<HostRequest> requests = new HashSet<>();
     Map<String, String> requestInfoProperties = request.getRequestInfoProperties();
-    final boolean forceDelete = requestInfoProperties.containsKey(FORCE_DELETE_COMPONENTS) &&
-                  requestInfoProperties.get(FORCE_DELETE_COMPONENTS).equals("true");
 
     for (Map<String, Object> propertyMap : getPropertyMaps(predicate)) {
       requests.add(getRequest(propertyMap));
@@ -330,7 +357,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
     DeleteStatusMetaData deleteStatusMetaData = modifyResources(new Command<DeleteStatusMetaData>() {
       @Override
       public DeleteStatusMetaData invoke() throws AmbariException {
-        return deleteHosts(requests, request.isDryRunRequest(), forceDelete);
+        return deleteHosts(requests, request.isDryRunRequest());
       }
     });
 
@@ -360,7 +387,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
 
   @Override
   protected Set<String> getPKPropertyIds() {
-    return PK_PROPERTY_IDS;
+    return new HashSet<>(keyPropertyIds.values());
   }
 
 
@@ -848,7 +875,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
   }
 
   @Transactional
-  protected DeleteStatusMetaData deleteHosts(Set<HostRequest> requests, boolean dryRun, boolean forceDelete)
+  protected DeleteStatusMetaData deleteHosts(Set<HostRequest> requests, boolean dryRun)
       throws AmbariException {
 
     AmbariManagementController controller = getManagementController();
@@ -863,7 +890,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
       }
 
       try {
-        validateHostInDeleteFriendlyState(hostRequest, clusters, forceDelete);
+        validateHostInDeleteFriendlyState(hostRequest, clusters);
         okToRemove.add(hostRequest);
       } catch (Exception ex) {
         deleteStatusMetaData.addException(hostName, ex);
@@ -964,7 +991,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
     clusters.publishHostsDeletion(allClustersWithHosts, hostNames);
   }
 
-  private void validateHostInDeleteFriendlyState(HostRequest hostRequest, Clusters clusters, boolean forceDelete) throws AmbariException {
+  private void validateHostInDeleteFriendlyState(HostRequest hostRequest, Clusters clusters) throws AmbariException {
     Set<String> clusterNamesForHost = new HashSet<>();
     String hostName = hostRequest.getHostname();
     if (null != hostRequest.getClusterName()) {
@@ -984,43 +1011,25 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
       List<ServiceComponentHost> list = cluster.getServiceComponentHosts(hostName);
 
       if (!list.isEmpty()) {
-        List<String> componentsToRemove = new ArrayList<>();
         List<String> componentsStarted = new ArrayList<>();
         for (ServiceComponentHost sch : list) {
-          componentsToRemove.add(sch.getServiceComponentName());
-          if (sch.getState() == State.STARTED) {
+          if (!sch.canBeRemoved()) {
             componentsStarted.add(sch.getServiceComponentName());
           }
         }
 
-        if (forceDelete) {
-          // error if components are running
-          if (!componentsStarted.isEmpty()) {
-            StringBuilder reason = new StringBuilder("Cannot remove host ")
-                .append(hostName)
-                .append(" from ")
-                .append(hostRequest.getClusterName())
-                .append(
-                    ".  The following roles exist, and these components must be stopped: ");
+        // error if components are running
+        if (!componentsStarted.isEmpty()) {
+          StringBuilder reason = new StringBuilder("Cannot remove host ")
+              .append(hostName)
+              .append(" from ")
+              .append(hostRequest.getClusterName())
+              .append(
+                  ".  The following roles exist, and these components are not in the removable state: ");
 
-            reason.append(StringUtils.join(componentsToRemove, ", "));
+          reason.append(StringUtils.join(componentsStarted, ", "));
 
-            throw new AmbariException(reason.toString());
-          }
-        } else {
-//          TODO why host with all components stopped can't be deleted? This functional is implemented and only this validation stops the request.
-          if (!componentsToRemove.isEmpty()) {
-            StringBuilder reason = new StringBuilder("Cannot remove host ")
-                .append(hostName)
-                .append(" from ")
-                .append(hostRequest.getClusterName())
-                .append(
-                    ".  The following roles exist, and these components must be stopped if running, and then deleted: ");
-
-            reason.append(StringUtils.join(componentsToRemove, ", "));
-
-            throw new AmbariException(reason.toString());
-          }
+          throw new AmbariException(reason.toString());
         }
       }
     }
@@ -1057,7 +1066,7 @@ public class HostResourceProvider extends AbstractControllerResourceProvider {
    *
    * @return the host name for the host request
    */
-  private String getHostNameFromProperties(Map<String, Object> properties) {
+  public static String getHostNameFromProperties(Map<String, Object> properties) {
     String hostname = (String) properties.get(HOST_HOST_NAME_PROPERTY_ID);
 
     return hostname != null ? hostname :

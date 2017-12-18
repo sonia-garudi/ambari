@@ -19,7 +19,6 @@ package org.apache.ambari.server.controller.internal;
 
 import static org.apache.ambari.server.agent.ExecutionCommand.KeyNames.HOOKS_FOLDER;
 import static org.apache.ambari.server.agent.ExecutionCommand.KeyNames.SERVICE_PACKAGE_FOLDER;
-import static org.apache.ambari.server.stack.StackManager.DEFAULT_HOOKS_FOLDER;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -299,7 +298,7 @@ public class UpgradeResourceProvider extends AbstractControllerResourceProvider 
    */
   @Inject
   public UpgradeResourceProvider(@Assisted AmbariManagementController controller) {
-    super(PROPERTY_IDS, KEY_PROPERTY_IDS, controller);
+    super(Resource.Type.Upgrade, PROPERTY_IDS, KEY_PROPERTY_IDS, controller);
   }
 
   @Override
@@ -977,7 +976,7 @@ public class UpgradeResourceProvider extends AbstractControllerResourceProvider 
           effectiveStackId.getStackVersion(), serviceName);
 
       commandParams.put(SERVICE_PACKAGE_FOLDER, serviceInfo.getServicePackageFolder());
-      commandParams.put(HOOKS_FOLDER, DEFAULT_HOOKS_FOLDER);
+      commandParams.put(HOOKS_FOLDER, s_configuration.getProperty(Configuration.HOOKS_FOLDER));
     }
   }
 
@@ -1054,10 +1053,6 @@ public class UpgradeResourceProvider extends AbstractControllerResourceProvider 
     // Apply additional parameters to the command that come from the stage.
     applyAdditionalParameters(wrapper, params);
 
-    // the ru_execute_tasks invokes scripts - it needs information about where
-    // the scripts live and for that it should always use the target repository
-    // stack
-    applyRepositoryAssociatedParameters(wrapper, effectiveRepositoryVersion.getStackId(), params);
 
     // add each host to this stage
     RequestResourceFilter filter = new RequestResourceFilter(serviceName, componentName,
@@ -1204,10 +1199,6 @@ public class UpgradeResourceProvider extends AbstractControllerResourceProvider 
 
     // Apply additional parameters to the command that come from the stage.
     applyAdditionalParameters(wrapper, commandParams);
-
-    // add things like hooks and service folders based on effective repo
-    applyRepositoryAssociatedParameters(wrapper, effectiveRepositoryVersion.getStackId(),
-        commandParams);
 
     ActionExecutionContext actionContext = new ActionExecutionContext(cluster.getClusterName(),
         "SERVICE_CHECK", filters, commandParams);

@@ -36,8 +36,10 @@ import org.apache.ambari.server.api.services.stackadvisor.StackAdvisorRequest;
 import org.apache.ambari.server.api.services.stackadvisor.StackAdvisorRequest.StackAdvisorRequestBuilder;
 import org.apache.ambari.server.api.services.stackadvisor.StackAdvisorRequest.StackAdvisorRequestType;
 import org.apache.ambari.server.api.services.stackadvisor.recommendations.RecommendationResponse;
+import org.apache.ambari.server.configuration.Configuration;
 import org.apache.ambari.server.controller.AmbariManagementController;
 import org.apache.ambari.server.controller.spi.Request;
+import org.apache.ambari.server.controller.spi.Resource;
 import org.apache.ambari.server.controller.spi.Resource.Type;
 import org.apache.ambari.server.controller.utilities.PropertyHelper;
 import org.apache.ambari.server.state.ChangedConfigInfo;
@@ -82,17 +84,19 @@ public abstract class StackAdvisorResourceProvider extends ReadOnlyResourceProvi
   private static final String CONFIG_GROUPS_HOSTS_PROPERTY = "hosts";
 
   protected static StackAdvisorHelper saHelper;
+  protected static Configuration configuration;
   protected static final String USER_CONTEXT_OPERATION_PROPERTY = "user_context/operation";
   protected static final String USER_CONTEXT_OPERATION_DETAILS_PROPERTY = "user_context/operation_details";
 
   @Inject
-  public static void init(StackAdvisorHelper instance) {
+  public static void init(StackAdvisorHelper instance, Configuration serverConfig) {
     saHelper = instance;
+    configuration = serverConfig;
   }
 
-  protected StackAdvisorResourceProvider(Set<String> propertyIds, Map<Type, String> keyPropertyIds,
-      AmbariManagementController managementController) {
-    super(propertyIds, keyPropertyIds, managementController);
+  protected StackAdvisorResourceProvider(Resource.Type type, Set<String> propertyIds, Map<Type, String> keyPropertyIds,
+                                         AmbariManagementController managementController) {
+    super(type, propertyIds, keyPropertyIds, managementController);
   }
 
   protected abstract String getRequestTypePropertyId();
@@ -133,6 +137,7 @@ public abstract class StackAdvisorResourceProvider extends ReadOnlyResourceProvi
           hgHostsMap);
       Map<String, Map<String, Map<String, String>>> configurations = calculateConfigurations(request);
       Map<String, String> userContext = readUserContext(request);
+      Boolean gplLicenseAccepted = configuration.getGplLicenseAccepted();
 
       List<ChangedConfigInfo> changedConfigurations =
         requestType == StackAdvisorRequestType.CONFIGURATION_DEPENDENCIES ?
@@ -147,7 +152,8 @@ public abstract class StackAdvisorResourceProvider extends ReadOnlyResourceProvi
         withConfigurations(configurations).
         withConfigGroups(configGroups).
         withChangedConfigurations(changedConfigurations).
-        withUserContext(userContext).build();
+        withUserContext(userContext).
+        withGPLLicenseAccepted(gplLicenseAccepted).build();
     } catch (Exception e) {
       LOG.warn("Error occurred during preparation of stack advisor request", e);
       Response response = Response.status(Status.BAD_REQUEST)

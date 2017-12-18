@@ -19,7 +19,6 @@
 package org.apache.ambari.server.controller.internal;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,6 +55,7 @@ import org.apache.ambari.server.state.SecurityType;
 import org.apache.ambari.server.state.StackInfo;
 import org.apache.ambari.server.topology.Blueprint;
 import org.apache.ambari.server.topology.BlueprintFactory;
+import org.apache.ambari.server.topology.GPLLicenseNotAcceptedException;
 import org.apache.ambari.server.topology.InvalidTopologyException;
 import org.apache.ambari.server.topology.SecurityConfiguration;
 import org.apache.ambari.server.topology.SecurityConfigurationFactory;
@@ -65,6 +65,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import com.google.gson.Gson;
 
 
@@ -118,10 +120,25 @@ public class BlueprintResourceProvider extends AbstractControllerResourceProvide
     "Configuration elements must be Maps";
   public static final String CONFIGURATION_MAP_SIZE_CHECK_ERROR_MESSAGE =
     "Configuration Maps must hold a single configuration type each";
-  // Primary Key Fields
-  private static Set<String> pkPropertyIds =
-    new HashSet<>(Arrays.asList(new String[]{
-      BLUEPRINT_NAME_PROPERTY_ID}));
+
+  /**
+   * The key property ids for a Blueprint resource.
+   */
+  private static Map<Resource.Type, String> keyPropertyIds = ImmutableMap.<Resource.Type, String>builder()
+      .put(Resource.Type.Blueprint, BLUEPRINT_NAME_PROPERTY_ID)
+      .build();
+
+  /**
+   * The property ids for a Blueprint resource.
+   */
+  private static Set<String> propertyIds = Sets.newHashSet(
+      BLUEPRINT_NAME_PROPERTY_ID,
+      STACK_NAME_PROPERTY_ID,
+      STACK_VERSION_PROPERTY_ID,
+      BLUEPRINT_SECURITY_PROPERTY_ID,
+      HOST_GROUP_PROPERTY_ID,
+      CONFIGURATION_PROPERTY_ID,
+      SETTING_PROPERTY_ID);
 
   /**
    * Used to create Blueprint instances
@@ -148,15 +165,10 @@ public class BlueprintResourceProvider extends AbstractControllerResourceProvide
   /**
    * Create a  new resource provider for the given management controller.
    *
-   * @param propertyIds     the property ids
-   * @param keyPropertyIds  the key property ids
    * @param controller      management controller
    */
-  BlueprintResourceProvider(Set<String> propertyIds,
-                            Map<Resource.Type, String> keyPropertyIds,
-                            AmbariManagementController controller) {
-
-    super(propertyIds, keyPropertyIds, controller);
+  BlueprintResourceProvider(AmbariManagementController controller) {
+    super(Resource.Type.Blueprint, propertyIds, keyPropertyIds, controller);
   }
 
   /**
@@ -179,7 +191,7 @@ public class BlueprintResourceProvider extends AbstractControllerResourceProvide
 
   @Override
   protected Set<String> getPKPropertyIds() {
-    return pkPropertyIds;
+    return new HashSet<>(keyPropertyIds.values());
   }
 
   @Override
@@ -519,7 +531,7 @@ public class BlueprintResourceProvider extends AbstractControllerResourceProvide
 
         try {
           blueprint.validateRequiredProperties();
-        } catch (InvalidTopologyException e) {
+        } catch (InvalidTopologyException | GPLLicenseNotAcceptedException e) {
           throw new IllegalArgumentException("Blueprint configuration validation failed: " + e.getMessage(), e);
         }
 

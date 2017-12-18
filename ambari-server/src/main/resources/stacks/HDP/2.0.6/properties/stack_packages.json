@@ -536,7 +536,8 @@
             "oozie-server"
           ],
           "PATCH": [
-            "oozie-server"
+            "oozie-server",
+            "oozie-client"
           ],
           "STANDARD": [
             "oozie-client",
@@ -994,12 +995,6 @@
           "current_dir": "{0}/current/atlas-client/conf"
         }
       ],
-      "beacon": [
-        {
-          "conf_dir": "/etc/beacon/conf",
-          "current_dir": "{0}/current/beacon-client/conf"
-        }
-      ],
       "druid": [
         {
           "conf_dir": "/etc/druid/conf",
@@ -1069,7 +1064,7 @@
       "livy": [
         {
           "conf_dir": "/etc/livy/conf",
-          "current_dir": "{0}/current/livy"
+          "current_dir": "{0}/current/livy-client/conf"
         }
       ],
       "mahout": [
@@ -1194,9 +1189,6 @@
       "ATLAS": {
         "packages": ["atlas"]
       },
-      "BEACON": {
-        "packages": ["beacon"]
-      },
       "DRUID": {
         "packages": ["druid", "superset"]
       },
@@ -1277,7 +1269,10 @@
       }
     },
     "upgrade-dependencies" : {
-      "HIVE": ["TEZ"],
+      "ATLAS": ["STORM"],
+      "HIVE": ["TEZ", "MAPREDUCE2"],
+      "TEZ": ["HIVE"],
+      "MAPREDUCE2": ["HIVE"],
       "MAHOUT": ["MAPREDUCE2"],
       "OOZIE": ["MAPREDUCE2"]
     }    

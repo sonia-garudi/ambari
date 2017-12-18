@@ -104,6 +104,8 @@ public class UpgradeCatalog260 extends AbstractUpgradeCatalog {
   public static final String FK_SDS_DESIRED_STACK_ID = "FK_sds_desired_stack_id";
   public static final String FK_REPO_VERSION_ID = "FK_repo_version_id";
 
+  public static final String CLUSTERS_TABLE = "clusters";
+
   public static final String UPGRADE_TABLE = "upgrade";
   public static final String UPGRADE_GROUP_TABLE = "upgrade_group";
   public static final String UPGRADE_ITEM_TABLE = "upgrade_item";
@@ -346,6 +348,8 @@ public class UpgradeCatalog260 extends AbstractUpgradeCatalog {
    * @throws java.sql.SQLException
    */
   private void updateUpgradeTable() throws SQLException {
+    dbAccessor.clearTableColumn(CLUSTERS_TABLE, UPGRADE_ID_COLUMN, null);
+
     dbAccessor.clearTable(UPGRADE_ITEM_TABLE);
     dbAccessor.clearTable(UPGRADE_GROUP_TABLE);
     dbAccessor.clearTable(UPGRADE_TABLE);
@@ -775,26 +779,28 @@ public class UpgradeCatalog260 extends AbstractUpgradeCatalog {
           // hive-interactive-site/hive.llap.zk.sm.keytab.file and hive-interactive-site/hive.llap.task.keytab.file respectively,
           // based on what hive-interactive-site/hive.llap.daemon.keytab.file has.
           Config hsiSiteConfig = cluster.getDesiredConfigByType(HIVE_INTERACTIVE_SITE);
-          Map<String, String> hsiSiteConfigProperties = hsiSiteConfig.getProperties();
-          if (hsiSiteConfigProperties != null &&
-                  hsiSiteConfigProperties.containsKey(HIVE_LLAP_DAEMON_KEYTAB_FILE)) {
-            String[] identities = {HIVE_LLAP_ZK_SM_KEYTAB_FILE, HIVE_LLAP_TASK_KEYTAB_FILE};
-            Map<String, String> newProperties = new HashMap<>();
-            for (String identity : identities) {
-              // Update only if we were able to modify the corresponding kerberos descriptor,
-              // reflected in list 'getYarnKerberosDescUpdatedList'.
-              if (getYarnKerberosDescUpdatedList().contains(identity) && hsiSiteConfigProperties.containsKey(identity)) {
-                newProperties.put(identity, hsiSiteConfigProperties.get(HIVE_LLAP_DAEMON_KEYTAB_FILE));
+          if (hsiSiteConfig != null) {
+            Map<String, String> hsiSiteConfigProperties = hsiSiteConfig.getProperties();
+            if (hsiSiteConfigProperties != null &&
+                    hsiSiteConfigProperties.containsKey(HIVE_LLAP_DAEMON_KEYTAB_FILE)) {
+              String[] identities = {HIVE_LLAP_ZK_SM_KEYTAB_FILE, HIVE_LLAP_TASK_KEYTAB_FILE};
+              Map<String, String> newProperties = new HashMap<>();
+              for (String identity : identities) {
+                // Update only if we were able to modify the corresponding kerberos descriptor,
+                // reflected in list 'getYarnKerberosDescUpdatedList'.
+                if (getYarnKerberosDescUpdatedList().contains(identity) && hsiSiteConfigProperties.containsKey(identity)) {
+                  newProperties.put(identity, hsiSiteConfigProperties.get(HIVE_LLAP_DAEMON_KEYTAB_FILE));
+                }
               }
-            }
 
-            // Update step.
-            if (newProperties.size() > 0) {
-              try {
-                updateConfigurationPropertiesForCluster(cluster, HIVE_INTERACTIVE_SITE, newProperties, true, false);
-                LOG.info("Updated HSI config(s) : " + newProperties.keySet() + " with value(s) = " + newProperties.values()+" respectively.");
-              } catch (AmbariException e) {
-                e.printStackTrace();
+              // Update step.
+              if (newProperties.size() > 0) {
+                try {
+                  updateConfigurationPropertiesForCluster(cluster, HIVE_INTERACTIVE_SITE, newProperties, true, false);
+                  LOG.info("Updated HSI config(s) : " + newProperties.keySet() + " with value(s) = " + newProperties.values() + " respectively.");
+                } catch (AmbariException e) {
+                  e.printStackTrace();
+                }
               }
             }
           }

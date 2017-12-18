@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.apache.ambari.logfeeder.common.LogFeederException;
+import org.apache.ambari.logfeeder.conf.LogFeederProps;
 import org.apache.ambari.logfeeder.input.InputMarker;
 import org.apache.ambari.logfeeder.metrics.MetricData;
 import org.apache.ambari.logfeeder.util.LogFeederUtil;
@@ -41,8 +42,8 @@ public class FilterKeyValue extends Filter {
   private MetricData errorMetric = new MetricData("filter.error.keyvalue", false);
 
   @Override
-  public void init() throws Exception {
-    super.init();
+  public void init(LogFeederProps logFeederProps) throws Exception {
+    super.init(logFeederProps);
 
     sourceField = filterDescriptor.getSourceField();
     valueSplit = StringUtils.defaultString(((FilterKeyValueDescriptor)filterDescriptor).getValueSplit(), valueSplit);
@@ -128,14 +129,14 @@ public class FilterKeyValue extends Filter {
 
   private String[] getNameValue(String nv) {
     String splitPattern = Pattern.quote(valueSplit);
-    return nv.split(splitPattern);
+    return nv.split(splitPattern, 2);
   }
 
   private void logParseError(String inputStr) {
     errorMetric.value++;
     String logMessageKey = this.getClass().getSimpleName() + "_PARSEERROR";
     LogFeederUtil.logErrorMessageByInterval(logMessageKey, "Error parsing string. length=" + inputStr.length() + ", input=" +
-        input.getShortDescription() + ". First upto 100 characters=" + StringUtils.abbreviate(inputStr, 100), null, LOG,
+        input.getShortDescription() + ". First upto 200 characters=" + StringUtils.abbreviate(inputStr, 200), null, LOG,
         Level.ERROR);
   }
 

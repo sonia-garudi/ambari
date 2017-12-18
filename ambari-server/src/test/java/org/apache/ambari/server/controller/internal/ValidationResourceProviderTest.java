@@ -33,6 +33,7 @@ import java.util.Set;
 import org.apache.ambari.server.api.services.stackadvisor.StackAdvisorHelper;
 import org.apache.ambari.server.api.services.stackadvisor.StackAdvisorRequest;
 import org.apache.ambari.server.api.services.stackadvisor.validations.ValidationResponse;
+import org.apache.ambari.server.configuration.Configuration;
 import org.apache.ambari.server.controller.AmbariManagementController;
 import org.apache.ambari.server.controller.spi.Request;
 import org.apache.ambari.server.controller.spi.RequestStatus;
@@ -46,20 +47,20 @@ public class ValidationResourceProviderTest {
     Map<Resource.Type, String> keyPropertyIds = Collections.emptyMap();
     Set<String> propertyIds = Collections.singleton(ValidationResourceProvider.VALIDATION_ID_PROPERTY_ID);
     AmbariManagementController ambariManagementController = mock(AmbariManagementController.class);
-    ValidationResourceProvider provider = spy(new ValidationResourceProvider(propertyIds,
-        keyPropertyIds, ambariManagementController));
+    ValidationResourceProvider provider = spy(new ValidationResourceProvider(ambariManagementController));
     StackAdvisorRequest stackAdvisorRequest = mock(StackAdvisorRequest.class);
     Request request = mock(Request.class);
     doReturn(stackAdvisorRequest).when(provider).prepareStackAdvisorRequest(request);
 
     StackAdvisorHelper saHelper = mock(StackAdvisorHelper.class);
+    Configuration configuration = mock(Configuration.class);
 
     ValidationResponse response = mock(ValidationResponse.class);
     Version version = mock(Version.class);
     doReturn(3).when(response).getId();
     doReturn(version).when(response).getVersion();
     doReturn(response).when(saHelper).validate(any(StackAdvisorRequest.class));
-    ValidationResourceProvider.init(saHelper);
+    ValidationResourceProvider.init(saHelper, configuration);
 
     RequestStatus status = provider.createResources(request);
 

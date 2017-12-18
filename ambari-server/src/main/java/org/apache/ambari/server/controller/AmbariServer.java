@@ -561,6 +561,9 @@ public class AmbariServer {
        */
       server.start();
 
+      //views initialization will reset inactive interval with default value, so we should set it after
+      configureMaxInactiveInterval();
+
       serverForAgent.start();
       LOG.info("********* Started Server **********");
 
@@ -851,10 +854,13 @@ public class AmbariServer {
     if (configs.getApiSSLAuthentication()) {
       sessionManager.getSessionCookieConfig().setSecure(true);
     }
+  }
 
+  protected void configureMaxInactiveInterval() {
     // each request that does not use AMBARISESSIONID will create a new
     // HashedSession in Jetty; these MUST be reaped after inactivity in order
     // to prevent a memory leak
+
     int sessionInactivityTimeout = configs.getHttpSessionInactiveTimeout();
     sessionManager.setMaxInactiveInterval(sessionInactivityTimeout);
   }
@@ -908,7 +914,8 @@ public class AmbariServer {
     PersistKeyValueService.init(injector.getInstance(PersistKeyValueImpl.class));
     KeyService.init(injector.getInstance(PersistKeyValueImpl.class));
     BootStrapResource.init(injector.getInstance(BootStrapImpl.class));
-    StackAdvisorResourceProvider.init(injector.getInstance(StackAdvisorHelper.class));
+    StackAdvisorResourceProvider.init(injector.getInstance(StackAdvisorHelper.class),
+        injector.getInstance(Configuration.class));
     StageUtils.setGson(injector.getInstance(Gson.class));
     StageUtils.setTopologyManager(injector.getInstance(TopologyManager.class));
     StageUtils.setConfiguration(injector.getInstance(Configuration.class));
