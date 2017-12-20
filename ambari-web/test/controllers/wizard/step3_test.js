@@ -378,6 +378,48 @@ describe('App.WizardStep3Controller', function () {
       expect(c.get('isSubmitDisabled')).to.equal(true);
     });
 
+    it('should remove hdp url prompt if no host of os_type exist', function () {
+      var host1 = Em.Object.create({name: 'host1', os_type: 'os1'});
+      var host2 = Em.Object.create({name: 'host2', os_type: 'os2'});
+      var hosts = [
+            host1,
+            host2
+          ];
+      c.reopen({
+        hosts: hosts,
+        newAmbariOsTypes: [],
+        promptAmbariRepoUrl: false,
+        promptRepoInfo: true,
+        newSupportedOsList : [
+          Em.Object.create({os_type : 'os2'})
+        ]
+      });
+      c.removeHosts([host2]).onPrimary();
+      expect(c.get('promptRepoInfo')).to.equal(false);
+    });
+
+    it('should not remove hdp url prompt if a host of os_type exist', function () {
+      var host1 = Em.Object.create({name: 'host1', os_type: 'os1'});
+      var host2 = Em.Object.create({name: 'host2', os_type: 'os2'});
+      var host3 = Em.Object.create({name: 'host3', os_type: 'os2'});
+      var hosts = [
+            host1,
+            host2,
+            host3
+          ];
+      c.reopen({
+        hosts: hosts,
+        newAmbariOsTypes: [],
+        promptAmbariRepoUrl: false,
+        promptRepoInfo: true,
+        newSupportedOsList : [
+          Em.Object.create({os_type : 'os2'})
+        ]
+      });
+      c.removeHosts([host2]).onPrimary();;
+      expect(c.get('promptRepoInfo')).to.equal(true);
+    });
+
   });
 
   describe('#removeSelectedHosts', function () {
@@ -2727,6 +2769,171 @@ describe('App.WizardStep3Controller', function () {
 
     });
 
+  });
+
+  describe('#checkRepoForNewOsType', function () {
+    it('should show prompt if repos dont exist for os_type in allRepos', function () {
+      var bootHosts = [
+                       Em.Object.create({name: 'host1', bootStatus: 'REGISTERED'}),
+                       Em.Object.create({name: 'host2', bootStatus: 'REGISTERED'})
+                       ];
+      var jsonHostData = {items:[
+                                 Em.Object.create({Hosts:{os_type: 'os1',host_name: 'host1'}}),
+                                 Em.Object.create({Hosts:{os_type: 'os2',host_name: 'host2'}})
+                                 ]};
+      var allRepos = [
+                      {os_type: 'os1'}
+                      ];
+      var allSupportedOSList = {operating_systems: [
+                                                    {
+                                                      OperatingSystems: { os_type : 'os2'},
+                                                      repositories: [
+                                                                     {
+                                                                       Repositories: {
+                                                                         base_url: 'baseurl1'
+                                                                       }
+                                                                     },
+                                                                     {
+                                                                       Repositories: {
+                                                                         base_url: 'baseurl2'
+                                                                       }
+                                                                     }
+                                                                     ]
+                                                    }
+                                                    ]
+      };
+      c.reopen({
+        bootHosts: bootHosts,
+        allRepos: allRepos,
+        promptRepoInfo: false,
+        jsonHostData: jsonHostData,
+        allSupportedOSList: allSupportedOSList
+      });
+      c.checkRepoForNewOsType();
+      expect(c.get('promptRepoInfo')).to.equal(true);
+    });
+  });
+
+  describe('#editLocalRepository', function () {
+    it('should set invalidFormatError to true for invalid base url', function() {
+      var repositories = [{
+        base_url: 'invalid url',
+        last_base_url: 'http://last_base_url'
+      }];
+      c.reopen({
+        repositories : repositories
+      });
+      c.editLocalRepository();
+      expect(c.get('repositories')[0].invalidFormatError).to.equal(true);
+    });
+
+    it('should set invalidFormatError to false and update the last_base_url to base_url', function() {
+      var repositories = [{
+        base_url: 'http://base_url',
+        last_base_url: 'http://last_base_url'
+      }];
+      c.reopen({
+        repositories : repositories
+      });
+      c.editLocalRepository();
+      expect(c.get('repositories')[0].invalidFormatError).to.equal(false);
+      expect(c.get('repositories')[0].last_base_url).to.equal('http://base_url');
+    });
+  });
+
+  describe('onNetworkIssuesExist', function () {
+    it('should remove base_url if networkIssueExist', function() {
+      var newSupportedOsList = [{
+        os_type : 'os1',
+        repositories: [
+                       {
+                         base_url: 'http://base_url',
+                         last_base_url: 'http://last_base_url'
+                       }
+                       ]
+      }];
+      c.reopen({
+        newSupportedOsList : newSupportedOsList,
+        networkIssuesExist : true
+      });
+      c.onNetworkIssuesExist();
+      expect(c.get('newSupportedOsList')[0].repositories[0].base_url).to.equal("");
+    });
+  });
+
+  describe('#usePublicRepo', function () {
+    beforeEach(function () {
+      var newSupportedOsList = [{
+        os_type : 'os1',
+        repositories: [
+                       {
+                         base_url: 'invalid_url',
+                         last_base_url: 'http://last_base_url',
+                         latest_base_url: 'http://latest_base_url'
+                       }
+                       ]
+      }];
+      c.reopen({
+        useRedhatSatellite: true,
+        isPublicRepo: false,
+        isLocalRepo: true,
+        newSupportedOsList : newSupportedOsList
+      });
+      c.usePublicRepo();
+    });
+
+    it('base_url is set to latest_base_url', function () {
+      expect(c.get('newSupportedOsList')[0].repositories[0].base_url).to.be.equal('http://latest_base_url');
+    });
+
+    it('`useRedhatSatellite` is set `false`', function () {
+      expect(c.get('useRedhatSatellite')).to.be.false;
+    });
+
+    it('`usePublicRepo` is set `true`', function () {
+      expect(c.get('isPublicRepo')).to.be.true;
+    });
+
+    it('`useLocalRepo` is set `false`', function () {
+      expect(c.get('isLocalRepo')).to.be.false;
+    });
+  });
+
+  describe('#useLocalRepo', function () {
+    beforeEach( function () {
+      var newSupportedOsList = [{
+        os_type : 'os1',
+        repositories: [
+                       {
+                         base_url: 'invalid_url',
+                         last_base_url: 'http://last_base_url',
+                         latest_base_url: 'http://latest_base_url'
+                       }
+                       ]
+      }];
+      c.reopen({
+        isPublicRepo: true,
+        isLocalRepo: false,
+        newSupportedOsList : newSupportedOsList
+      });
+      c.useLocalRepo();
+    });
+
+    it('base_url is set to blank', function () {
+      expect(c.get('newSupportedOsList')[0].repositories[0].base_url).to.be.equal('');
+    });
+
+    it('last_base_url is set to blank', function () {
+      expect(c.get('newSupportedOsList')[0].repositories[0].last_base_url).to.be.equal('');
+    });
+
+    it('`isPublicRepo` is set `false`', function () {
+      expect(c.get('isPublicRepo')).to.be.false;
+    });
+
+    it('`isLocalRepo` is set `true`', function () {
+      expect(c.get('isLocalRepo')).to.be.true;
+    });
   });
 
   describe('#getHostCheckTasksSuccess', function() {
