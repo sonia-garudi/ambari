@@ -137,9 +137,15 @@ class Master(Script):
     self.chown_zeppelin_pid_dir(env)
 
     # write out zeppelin-site.xml
+    my_map = {}
+    for key, value in params.config['configurations']['zeppelin-config'].iteritems():
+      my_map[key]=value
+    my_map['zeppelin.server.kerberos.keytab']=params.zeppelin_kerberos_keytab
+    my_map['zeppelin.server.kerberos.principal']=params.zeppelin_kerberos_principal
+
     XmlConfig("zeppelin-site.xml",
               conf_dir=params.conf_dir,
-              configurations=params.config['configurations']['zeppelin-config'],
+              configurations=my_map,
               owner=params.zeppelin_user,
               group=params.zeppelin_group
               )
@@ -533,9 +539,14 @@ class Master(Script):
         if params.zookeeper_znode_parent \
                 and params.hbase_zookeeper_quorum:
             interpreter['properties']['phoenix.driver'] = 'org.apache.phoenix.jdbc.PhoenixDriver'
-            interpreter['properties']['phoenix.hbase.client.retries.number'] = '1'
-            interpreter['properties']['phoenix.user'] = 'phoenixuser'
-            interpreter['properties']['phoenix.password'] = ''
+            if 'phoenix.hbase.client.retries.number' not in interpreter['properties']:
+              interpreter['properties']['phoenix.hbase.client.retries.number'] = '1'
+            if 'phoenix.phoenix.query.numberFormat' not in interpreter['properties']:
+              interpreter['properties']['phoenix.phoenix.query.numberFormat'] = '#.#'
+            if 'phoenix.user' not in interpreter['properties']:
+              interpreter['properties']['phoenix.user'] = 'phoenixuser'
+            if 'phoenix.password' not in interpreter['properties']:
+              interpreter['properties']['phoenix.password'] = ''
             interpreter['properties']['phoenix.url'] = "jdbc:phoenix:" + \
                                                     params.hbase_zookeeper_quorum + ':' + \
                                                     params.zookeeper_znode_parent
